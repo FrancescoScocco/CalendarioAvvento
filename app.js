@@ -60,8 +60,23 @@ function writeOpenedMap(map) {
 
 function toPublicDoor(raw) {
   const openedAt = raw.openedAt || null;
-  const opened = Boolean(openedAt);
   const unlocked = isDayUnlocked(raw.day, openedAt);
+  if (!unlocked) {
+    return {
+      day: raw.day,
+      title: null,
+      artist: null,
+      type: raw.type === 'finale' ? 'finale' : 'song',
+      opened: false,
+      openedAt: null,
+      unlocked: false,
+      slogan: null,
+      youtubeId: '',
+      audioUrl: null,
+      hasMedia: false
+    };
+  }
+  const opened = Boolean(openedAt);
   return {
     day: raw.day,
     title: raw.title,
@@ -69,13 +84,11 @@ function toPublicDoor(raw) {
     type: raw.type || 'song',
     opened,
     openedAt,
-    unlocked,
+    unlocked: true,
     slogan: opened ? (raw.slogan || null) : null,
     youtubeId: raw.youtubeId || '',
     audioUrl: raw.audioFile ? `/media/${encodeURIComponent(raw.audioFile)}` : null,
-    hasMedia: Boolean(raw.audioFile || raw.youtubeId),
-    _slogan: raw.slogan || '',
-    _audioFile: raw.audioFile || null
+    hasMedia: Boolean(raw.audioFile || raw.youtubeId)
   };
 }
 
@@ -89,7 +102,7 @@ function buildStaticPayload() {
     return toPublicDoor({ ...item, openedAt, audioFile: null });
   });
   return {
-    doors: all.filter((d) => d.unlocked),
+    doors: all,
     lockByDate,
     eventYear,
     today: calendarToday
@@ -115,33 +128,37 @@ function toast(text) {
   toastTimer = setTimeout(() => box.classList.remove('show'), 4200);
 }
 
-function emptyCalendarMessage() {
-  if (demoUnlocked()) return 'Nessuna casella da mostrare.';
-  if (!lockByDate) return 'Nessuna casella da mostrare.';
-  const today = calendarToday;
-  if (today && (today.year < eventYear || (today.year === eventYear && today.month < 12))) {
-    return `Le caselle si sbloccano dal 1 dicembre ${eventYear}. Torna tra poco!`;
-  }
-  return 'Nessuna casella disponibile in questo momento.';
-}
-
 function renderDoors() {
   const fragment = document.createDocumentFragment();
   if (!doors.length) {
     const empty = document.createElement('div');
     empty.className = 'loading-grid';
-    empty.textContent = emptyCalendarMessage();
+    empty.textContent = 'Nessuna casella da mostrare.';
     fragment.appendChild(empty);
   } else {
     doors.forEach((door) => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'door' + (door.opened ? ' opened' : '');
+      const locked = !door.unlocked;
+      button.className = 'door'
+        + (door.opened ? ' opened' : '')
+        + (locked ? ' locked' : '');
       button.dataset.color = palettes[(door.day - 1) % palettes.length];
       button.dataset.finale = String(door.type === 'finale');
       button.dataset.day = String(door.day);
-      button.setAttribute('aria-label', `${door.day} dicembre: ${door.opened ? 'casella già aperta' : 'apri la casella'}${door.opened ? ' - ' + door.title : ''}`);
-      if (door.opened) {
+      button.setAttribute(
+        'aria-label',
+        `${door.day} dicembre: ${
+          door.opened ? 'casella già aperta' : locked ? 'casella ancora bloccata' : 'apri la casella'
+        }${door.opened && door.title ? ` - ${door.title}` : ''}`
+      );
+      if (locked) {
+        button.setAttribute('aria-disabled', 'true');
+        button.innerHTML = `
+          <span class="door-number">${door.day}</span>
+          <span class="door-symbol" aria-hidden="true">🔒</span>
+          <span class="door-bottom">${door.type === 'finale' ? 'Gran finale' : 'In arrivo'}</span>`;
+      } else if (door.opened) {
         button.innerHTML = `
           <span class="door-number">${door.day}</span>
           <span class="door-symbol" aria-hidden="true">${door.type === 'finale' ? '🎄' : '♫'}</span>
@@ -160,19 +177,21 @@ function renderDoors() {
   }
   grid.replaceChildren(fragment);
   const count = doors.filter(d => d.type !== 'finale' && d.opened).length;
-  const available = doors.filter(d => d.type !== 'finale').length;
+  const unlockedSongs = doors.filter(d => d.type !== 'finale' && d.unlocked).length;
   $('#progressLabel').textContent = count === 23
     ? 'Tutte le canzoni scoperte! 🎉'
-    : lockByDate && available > 0 && available < 23
-      ? `${count} scoperte · oggi fino al giorno ${available}`
-      : `${count} canzon${count === 1 ? 'e scoperta' : 'i scoperte'}`;
+    : lockByDate && unlockedSongs > 0 && unlockedSongs < 23
+      ? `${count} scoperte · oggi puoi aprire fino al giorno ${unlockedSongs}`
+      : lockByDate && unlockedSongs === 0
+        ? `In attesa del 1 dicembre ${eventYear}`
+        : `${count} canzon${count === 1 ? 'e scoperta' : 'i scoperte'}`;
   $('#progressFraction').textContent = `${count} / 23`;
   $('#progressFill').style.width = `${count / 23 * 100}%`;
   $('#progressTrack').setAttribute('aria-valuenow', String(count));
   const tip = document.querySelector('.legend-tip');
   if (tip) {
     tip.textContent = lockByDate && !demoUnlocked()
-      ? '♪ Solo i giorni fino a oggi sono visibili'
+      ? '♪ I giorni futuri restano chiusi'
       : '♪ Clicca su un numero per ascoltare';
   }
 }
@@ -287,7 +306,7 @@ async function openDoor(day) {
   const door = doors.find(d => d.day === day);
   if (!door) return;
   if (!door.unlocked) {
-    toast(`La casella ${day} si sblocca il ${day} dicembre.`);
+    toast(`La casella ${day} si sblocca il ${day} dicembre ${eventYear}.`);
     return;
   }
   if (door.type !== 'finale' && !door.hasMedia && !door.opened) {

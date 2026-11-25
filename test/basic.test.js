@@ -31,11 +31,19 @@ test('Le caselle aperte restano accessibili anche con il blocco data', () => {
   assert.equal(isUnlocked(10, '2026-12-10T10:00:00Z'), true);
 });
 
-test('Lo slogan resta nascosto se la casella non è stata aperta', () => {
+test('Una casella bloccata non espone titolo, slogan o media', () => {
   const door = publicDoor({
-    day: 5, title: 'Segreta', artist: 'Band', type: 'song', openedAt: null,
-    slogan: 'Non spoilerare', audioFile: null, youtubeId: ''
+    day: 24, title: 'Segreta', artist: 'Band', type: 'song', openedAt: null,
+    slogan: 'Non spoilerare', audioFile: 'x.mp3', youtubeId: 'abcdefghijk'
   });
-  assert.equal(door.slogan, null);
-  assert.equal(door.title, 'Segreta');
+  // A novembre (o per giorni futuri) la card resta senza spoiler.
+  if (!door.unlocked) {
+    assert.equal(door.title, null);
+    assert.equal(door.slogan, null);
+    assert.equal(door.youtubeId, '');
+    assert.equal(door.hasMedia, false);
+  } else {
+    assert.equal(door.slogan, null);
+    assert.equal(door.title, 'Segreta');
+  }
 });

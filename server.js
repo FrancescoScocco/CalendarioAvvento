@@ -166,6 +166,23 @@ function isUnlocked(day, openedAt) {
 }
 
 function publicDoor(d) {
+  const unlocked = isUnlocked(d.day, d.openedAt);
+  // Giorni futuri: la card resta visibile, ma senza contenuto apribile/spoiler.
+  if (!unlocked) {
+    return {
+      day: d.day,
+      title: null,
+      artist: null,
+      type: d.type === 'finale' ? 'finale' : 'song',
+      opened: false,
+      openedAt: null,
+      unlocked: false,
+      slogan: null,
+      youtubeId: '',
+      audioUrl: null,
+      hasMedia: false
+    };
+  }
   const opened = Boolean(d.openedAt);
   return {
     day: d.day,
@@ -174,7 +191,7 @@ function publicDoor(d) {
     type: d.type,
     opened,
     openedAt: d.openedAt,
-    unlocked: isUnlocked(d.day, d.openedAt),
+    unlocked: true,
     // Lo slogan è restituito soltanto quando la casella è stata aperta.
     slogan: opened ? d.slogan : null,
     youtubeId: d.youtubeId || '',
@@ -263,11 +280,10 @@ async function router(req, res) {
   }
 
   if (method === 'GET' && pathname === '/api/calendar') {
-    // Solo le caselle già sbloccate: le future non compaiono e non sono apribili.
-    const visible = calendar.map(publicDoor).filter((d) => d.unlocked);
+    // Tutte le card restano in griglia; quelle future arrivano senza contenuto.
     const { year, month, day: today } = romeDate();
     return json(res, 200, {
-      doors: visible,
+      doors: calendar.map(publicDoor),
       openedSongs: calendar.filter(d => d.type === 'song' && d.openedAt).length,
       totalSongs: 23,
       lockByDate: LOCK_BY_DATE,

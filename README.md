@@ -35,7 +35,7 @@ Il sito pubblico è l'`index.html` in **root** (non il README). Con Pages impost
 
 `https://francescoscocco.github.io/CalendarioAvvento/`
 
-Su Pages non c'è il backend Node: le aperture restano nel browser e **Gestisci** è disattivato. Prima del 1° dicembre le caselle restano nascoste; per un'anteprima di tutte le card aggiungi `?demo=1` all'URL.
+Su Pages non c'è il backend Node: le aperture restano nel browser e **Gestisci** è disattivato. Tutte le card si vedono; quelle future restano chiuse fino al giorno giusto. Per sbloccarle tutte in anteprima aggiungi `?demo=1` all'URL.
 
 ## Scrivere gli slogan e configurare le canzoni
 
@@ -49,7 +49,7 @@ Sono già configurati i link per molti successi celebri. Alcune caselle (es. **B
 
 ## Sblocco giornaliero a dicembre
 
-Di default si vedono e si possono aprire **solo le caselle fino al giorno corrente** (fuso **Europe/Rome**). Il 3 dicembre compaiono solo le prime 3; i giorni successivi restano nascosti.
+Di default **tutte le 24 card restano visibili**, ma fino al giorno previsto di dicembre (fuso **Europe/Rome**) quelle future sono chiuse: niente contenuto e non si possono aprire. Il 3 dicembre solo le prime 3 sono cliccabili.
 
 Per le prove fuori stagione, disattiva il blocco in `.env`:
 
