@@ -65,6 +65,9 @@ function saveCalendar(calendar) {
   const tmp = `${DATA_FILE}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(calendar, null, 2), 'utf8');
   fs.renameSync(tmp, DATA_FILE);
+  try { exportStaticCalendar(calendar); } catch (e) {
+    console.warn('[calendar] export static non riuscito:', e.message);
+  }
 }
 
 function loadCalendar() {
@@ -158,15 +161,17 @@ function romeDate() {
   return Object.fromEntries(parts.filter(x => x.type !== 'literal').map(x => [x.type, Number(x.value)]));
 }
 
-function isUnlocked(day, openedAt) {
-  if (openedAt || !LOCK_BY_DATE) return true;
+function isUnlocked(day) {
+  // La data odierna (Europe/Rome) decide sempre: openedAt non sblocca in anticipo.
+  if (!LOCK_BY_DATE) return true;
   const { year, month, day: today } = romeDate();
-  return year > EVENT_YEAR ||
-    (year === EVENT_YEAR && (month > 12 || (month === 12 && today >= day)));
+  if (year > EVENT_YEAR) return true;
+  if (year < EVENT_YEAR) return false;
+  return month === 12 && today >= day;
 }
 
 function publicDoor(d) {
-  const unlocked = isUnlocked(d.day, d.openedAt);
+  const unlocked = isUnlocked(d.day);
   // Giorni futuri: la card resta visibile, ma senza contenuto apribile/spoiler.
   if (!unlocked) {
     return {
@@ -198,6 +203,26 @@ function publicDoor(d) {
     audioUrl: d.audioFile ? `/media/${encodeURIComponent(d.audioFile)}` : null,
     hasMedia: Boolean(d.audioFile || d.youtubeId)
   };
+}
+
+function exportStaticCalendar(list) {
+  // Dati pubblici per GitHub Pages: titoli/slogan/youtube, senza aperture né audio locali.
+  const payload = list.map((d) => ({
+    day: d.day,
+    title: d.title,
+    artist: d.artist || '',
+    youtubeId: d.youtubeId || '',
+    slogan: d.slogan || '',
+    type: d.type || 'song',
+    audioFile: null,
+    openedAt: null
+  }));
+  const text = `${JSON.stringify(payload, null, 2)}\n`;
+  fs.writeFileSync(path.join(ROOT, 'calendar-data.json'), text, 'utf8');
+  const publicMirror = path.join(ROOT, 'public', 'calendar-data.json');
+  if (fs.existsSync(path.dirname(publicMirror))) {
+    fs.writeFileSync(publicMirror, text, 'utf8');
+  }
 }
 
 function dayRecord(day) {
@@ -296,7 +321,7 @@ async function router(req, res) {
   if (method === 'POST' && opening) {
     const door = dayRecord(Number(opening[1]));
     if (!door) return err(res, 404, 'Casella inesistente.');
-    if (!isUnlocked(door.day, door.openedAt)) {
+    if (!isUnlocked(door.day)) {
       return err(res, 403, `La casella ${door.day} sarà disponibile dal ${door.day} dicembre ${EVENT_YEAR}.`);
     }
     if (!door.openedAt) {
@@ -396,7 +421,7 @@ async function router(req, res) {
     const name = pathname.slice('/media/'.length);
     // Solo file di caselle esistenti e già sbloccate (niente spoiler sui giorni futuri).
     const owner = calendar.find((d) => d.audioFile === name);
-    if (name !== path.basename(name) || !owner || !isUnlocked(owner.day, owner.openedAt))
+    if (name !== path.basename(name) || !owner || !isUnlocked(owner.day))
       return err(res, 404, 'Audio non trovato.');
     return serveFile(req, res, path.join(UPLOADS_DIR, name), true);
   }

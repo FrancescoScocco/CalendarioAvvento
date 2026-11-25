@@ -37,6 +37,8 @@ Il sito pubblico è l'`index.html` in **root** (non il README). Con Pages impost
 
 Su Pages non c'è il backend Node: le aperture restano nel browser e **Gestisci** è disattivato. Tutte le card si vedono; quelle future restano chiuse fino al giorno giusto. Per sbloccarle tutte in anteprima aggiungi `?demo=1` all'URL.
 
+Canzoni e slogan sul sito pubblico arrivano da `calendar-data.json` (aggiornato automaticamente quando salvi dal server locale). Dopo le modifiche fai **commit + push** su `main` per vederle su GitHub Pages.
+
 ## Scrivere gli slogan e configurare le canzoni
 
 1. Premi **Gestisci**.

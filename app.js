@@ -38,11 +38,13 @@ function demoUnlocked() {
   return new URLSearchParams(location.search).has('demo');
 }
 
-function isDayUnlocked(day, openedAt) {
-  if (openedAt || !lockByDate || demoUnlocked()) return true;
+function isDayUnlocked(day) {
+  // Ad ogni refresh: conta solo la data odierna (Europe/Rome), non aperture di prova.
+  if (!lockByDate || demoUnlocked()) return true;
   const { year, month, day: today } = calendarToday || romeDate();
-  return year > eventYear ||
-    (year === eventYear && (month > 12 || (month === 12 && today >= day)));
+  if (year > eventYear) return true;
+  if (year < eventYear) return false;
+  return month === 12 && today >= day;
 }
 
 function readOpenedMap() {
@@ -59,8 +61,7 @@ function writeOpenedMap(map) {
 }
 
 function toPublicDoor(raw) {
-  const openedAt = raw.openedAt || null;
-  const unlocked = isDayUnlocked(raw.day, openedAt);
+  const unlocked = isDayUnlocked(raw.day);
   if (!unlocked) {
     return {
       day: raw.day,
@@ -76,6 +77,7 @@ function toPublicDoor(raw) {
       hasMedia: false
     };
   }
+  const openedAt = raw.openedAt || null;
   const opened = Boolean(openedAt);
   return {
     day: raw.day,
@@ -92,13 +94,28 @@ function toPublicDoor(raw) {
   };
 }
 
+function pruneOpenedMap() {
+  const map = readOpenedMap();
+  let changed = false;
+  for (const key of Object.keys(map)) {
+    const day = Number(key);
+    if (!Number.isInteger(day) || !isDayUnlocked(day)) {
+      delete map[key];
+      changed = true;
+    }
+  }
+  if (changed) writeOpenedMap(map);
+  return map;
+}
+
 function buildStaticPayload() {
-  const openedMap = readOpenedMap();
+  // Ricalcola sempre la data a ogni refresh/avvio.
   calendarToday = romeDate();
   lockByDate = !demoUnlocked();
   eventYear = EVENT_YEAR_DEFAULT;
+  const openedMap = pruneOpenedMap();
   const all = staticCatalog.map((item) => {
-    const openedAt = openedMap[String(item.day)] || null;
+    const openedAt = isDayUnlocked(item.day) ? (openedMap[String(item.day)] || null) : null;
     return toPublicDoor({ ...item, openedAt, audioFile: null });
   });
   return {
@@ -221,11 +238,13 @@ async function loadStaticCatalog() {
 async function refreshCalendar(silent = false) {
   try {
     if (staticMode) {
+      // Modalità Pages: ricontrolla sempre la data odierna.
       applyCalendarResult(buildStaticPayload());
       return;
     }
     const result = await api('/api/calendar');
     staticMode = false;
+    // Il backend ricalcola unlocked con la data di oggi a ogni richiesta.
     applyCalendarResult(result);
   } catch (e) {
     try {

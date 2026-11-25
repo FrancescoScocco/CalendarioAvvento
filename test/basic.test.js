@@ -23,12 +23,32 @@ test('Riconosce video YouTube validi, ma non siti falsi', () => {
 test('Uno slogan non compare pubblicamente prima dell’apertura', () => {
   const song = {day: 1, title: 'Test', artist: 'Tester', type:'song', openedAt:null,
     slogan:'Segreto!', audioFile:null, youtubeId:'4fndeDfaWCg'};
-  assert.equal(publicDoor(song).slogan, null);
+  const closed = publicDoor(song);
+  assert.equal(closed.slogan, null);
+  if (!closed.unlocked) {
+    // Prima di dicembre la card è bloccata: niente spoiler, nemmeno con openedAt di prova.
+    assert.equal(closed.title, null);
+    assert.equal(publicDoor({...song, openedAt:'2026-11-20T15:00:00Z'}).slogan, null);
+    return;
+  }
   assert.equal(publicDoor({...song, openedAt:'2026-12-01T15:00:00Z'}).slogan, 'Segreto!');
 });
 
-test('Le caselle aperte restano accessibili anche con il blocco data', () => {
-  assert.equal(isUnlocked(10, '2026-12-10T10:00:00Z'), true);
+test('Una apertura di prova non sblocca un giorno futuro rispetto a oggi', () => {
+  // A novembre 2026 il giorno 10 deve restare chiuso anche con openedAt.
+  const { year, month } = (() => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date());
+    return Object.fromEntries(parts.filter(x => x.type !== 'literal').map(x => [x.type, Number(x.value)]));
+  })();
+  if (year < 2026 || (year === 2026 && month < 12)) {
+    assert.equal(isUnlocked(10), false);
+    assert.equal(publicDoor({
+      day: 1, title: 'X', artist: '', type: 'song', openedAt: '2026-11-20T09:00:00Z',
+      slogan: 'No', audioFile: null, youtubeId: 'abcdefghijk'
+    }).unlocked, false);
+  }
 });
 
 test('Una casella bloccata non espone titolo, slogan o media', () => {
