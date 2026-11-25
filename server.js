@@ -8,12 +8,24 @@ const crypto = require('node:crypto');
 const { URL } = require('node:url');
 
 const ROOT = __dirname;
-const PUBLIC_DIR = path.join(ROOT, 'public');
+// I file del sito (index/app/style) stanno in root per GitHub Pages; public/ resta un mirror.
+const PUBLIC_DIR = ROOT;
 const DATA_DIR = path.join(ROOT, 'data');
 const UPLOADS_DIR = path.join(ROOT, 'uploads');
 const DATA_FILE = path.join(DATA_DIR, 'calendar.json');
 const SEED_FILE = path.join(DATA_DIR, 'seed.json');
 const PASSWORD_FILE = path.join(DATA_DIR, 'admin-password.txt');
+const STATIC_DENY = [
+  /^\/server\.js$/i,
+  /^\/package\.json$/i,
+  /^\/\.env(?:\.example)?$/i,
+  /^\/\.git(?:\/|$)/i,
+  /^\/test(?:\/|$)/i,
+  /^\/node_modules(?:\/|$)/i,
+  /^\/data\/admin-password\.txt$/i,
+  /^\/data\/calendar\.json$/i,
+  /^\/uploads(?:\/|$)/i
+];
 
 // Piccolo lettore .env per rendere l'avvio facile anche senza librerie aggiuntive.
 const envFile = path.join(ROOT, '.env');
@@ -28,7 +40,8 @@ if (fs.existsSync(envFile)) {
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
-const LOCK_BY_DATE = process.env.LOCK_BY_DATE === '1';
+// Attivo di default: le caselle future restano nascoste. Usa LOCK_BY_DATE=0 solo in prova.
+const LOCK_BY_DATE = process.env.LOCK_BY_DATE !== '0';
 const EVENT_YEAR = Number(process.env.EVENT_YEAR) || 2026;
 const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -250,12 +263,16 @@ async function router(req, res) {
   }
 
   if (method === 'GET' && pathname === '/api/calendar') {
+    // Solo le caselle già sbloccate: le future non compaiono e non sono apribili.
+    const visible = calendar.map(publicDoor).filter((d) => d.unlocked);
+    const { year, month, day: today } = romeDate();
     return json(res, 200, {
-      doors: calendar.map(publicDoor),
+      doors: visible,
       openedSongs: calendar.filter(d => d.type === 'song' && d.openedAt).length,
       totalSongs: 23,
       lockByDate: LOCK_BY_DATE,
-      eventYear: EVENT_YEAR
+      eventYear: EVENT_YEAR,
+      today: { year, month, day: today }
     });
   }
 
@@ -361,17 +378,24 @@ async function router(req, res) {
 
   if (method === 'GET' && pathname.startsWith('/media/')) {
     const name = pathname.slice('/media/'.length);
-    // Espone soltanto file associati a una delle caselle.
-    if (name !== path.basename(name) || !calendar.some(d => d.audioFile === name))
+    // Solo file di caselle esistenti e già sbloccate (niente spoiler sui giorni futuri).
+    const owner = calendar.find((d) => d.audioFile === name);
+    if (name !== path.basename(name) || !owner || !isUnlocked(owner.day, owner.openedAt))
       return err(res, 404, 'Audio non trovato.');
     return serveFile(req, res, path.join(UPLOADS_DIR, name), true);
   }
 
   if (method === 'GET' && !pathname.startsWith('/api/')) {
     const location = pathname === '/' ? '/index.html' : pathname;
+    if (STATIC_DENY.some((re) => re.test(location))) return err(res, 404, 'Risorsa non trovata.');
     const target = path.resolve(PUBLIC_DIR, '.' + location);
-    if (target !== PUBLIC_DIR && target.startsWith(PUBLIC_DIR + path.sep))
+    const allowedRoot = target === PUBLIC_DIR || target.startsWith(PUBLIC_DIR + path.sep);
+    if (allowedRoot && fs.existsSync(target) && fs.statSync(target).isFile())
       return serveFile(req, res, target);
+    // Compatibilità: eventuale mirror in /public
+    const legacy = path.resolve(ROOT, 'public', '.' + location.replace(/^\/public/, ''));
+    if (legacy.startsWith(path.join(ROOT, 'public') + path.sep) && fs.existsSync(legacy) && fs.statSync(legacy).isFile())
+      return serveFile(req, res, legacy);
   }
   return err(res, 404, 'Risorsa non trovata.');
 }

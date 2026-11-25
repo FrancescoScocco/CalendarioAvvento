@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10271f">
+  <meta name="description" content="24 giorni di dicembre, 23 canzoni indimenticabili e una sorpresa finale di Natale.">
+  <title>Calendario dell'Avvento Musicale</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="page-glow" aria-hidden="true"></div>
+  <main class="poster">
+    <header class="hero">
+      <div class="hero-topline">
+        <span class="tiny-star" aria-hidden="true">✦</span>
+        <span>1 — 24 DICEMBRE</span>
+        <span class="tiny-star" aria-hidden="true">✦</span>
+      </div>
+      <div class="ornament ornament-left" aria-hidden="true"><span>✳</span></div>
+      <div class="ornament ornament-right" aria-hidden="true"><span>✳</span></div>
+      <p class="hero-pretitle">IL NOSTRO</p>
+      <h1>Calendario<br><small>dell'Avvento</small><em>Musicale</em></h1>
+      <p class="hero-description">23 canzoni iconiche. 23 frasi da cantare.<br>Un dicembre tutto da scoprire.</p>
+      <div class="stars-ribbon" aria-hidden="true">✧ &nbsp; ✦ &nbsp; ✧ &nbsp; ✦ &nbsp; ✧</div>
+    </header>
+
+    <section class="board-section" aria-labelledby="board-heading">
+      <div class="board-toolbar">
+        <div>
+          <p class="eyebrow">IL CONTO ALLA ROVESCIA</p>
+          <h2 id="board-heading">Ogni casella, una sorpresa</h2>
+        </div>
+        <button class="settings-btn" id="adminButton" type="button" title="Gestisci canzoni e slogan">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-1.92 1.92-.06-.06A1.65 1.65 0 0 0 16 18.4a1.65 1.65 0 0 0-1 1.51V20H9v-.09A1.65 1.65 0 0 0 8 18.4a1.65 1.65 0 0 0-1.82.33l-.06.06-1.92-1.92.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3V10h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06L6.13 5.2l.06.06A1.65 1.65 0 0 0 8 5.6a1.65 1.65 0 0 0 1-1.51V4h6v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06 1.92 1.92-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21v4h-.09A1.65 1.65 0 0 0 19.4 15Z"/></svg>
+          Gestisci
+        </button>
+      </div>
+      <div class="progress-row">
+        <span id="progressLabel">Caricamento calendario…</span>
+        <span class="progress-fraction" id="progressFraction">0 / 23</span>
+      </div>
+      <div class="progress-track" role="progressbar" aria-label="Canzoni scoperte" aria-valuemin="0" aria-valuemax="23" aria-valuenow="0" id="progressTrack"><div id="progressFill" class="progress-fill"></div></div>
+      <div id="calendarGrid" class="calendar-grid" aria-label="Le 24 caselle dell'Avvento">
+        <div class="loading-grid">✨ Prepariamo le sorprese di Natale…</div>
+      </div>
+      <div class="legend">
+        <span><i class="legend-dot legend-closed"></i> Da scoprire</span>
+        <span><i class="legend-dot legend-open"></i> Aperta per sempre</span>
+        <span class="legend-tip">♪ Solo i giorni fino a oggi sono visibili</span>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-branch" aria-hidden="true">✧ ───── ✦ ───── ✧</div>
+      <p class="footer-script">Merry Christmas</p>
+      <p>Le canzoni si ascoltano. I ricordi restano. <span aria-hidden="true">♥</span></p>
+    </footer>
+  </main>
+
+  <dialog class="modal player-dialog" id="playerDialog" aria-labelledby="playerTitle">
+    <div class="modal-inner">
+      <button class="icon-close" id="closePlayer" type="button" aria-label="Chiudi ascolto">×</button>
+      <p class="modal-eyebrow" id="playerDay">1 DICEMBRE</p>
+      <div class="record-icon" aria-hidden="true">♫</div>
+      <h2 id="playerTitle">La canzone del giorno</h2>
+      <p id="playerArtist" class="modal-artist"></p>
+      <div class="slogan-panel">
+        <span class="slogan-label">IL TUO SLOGAN</span>
+        <p id="playerSlogan">Si apre il sipario…</p>
+      </div>
+      <div id="mediaMount" class="media-mount"></div>
+      <p class="player-hint" id="playerHint"></p>
+      <button class="button button-secondary" id="returnCalendar" type="button">Torna al calendario <span aria-hidden="true">↗</span></button>
+      <p class="permanent-note">✓ Questa casella rimarrà aperta anche dopo che esci.</p>
+    </div>
+  </dialog>
+
+  <dialog class="modal admin-dialog" id="adminDialog" aria-labelledby="adminHeading">
+    <div class="modal-inner">
+      <button class="icon-close" id="closeAdmin" type="button" aria-label="Chiudi gestione">×</button>
+      <p class="modal-eyebrow">SOLO PER L'ORGANIZZATORE</p>
+      <h2 id="adminHeading">Gestisci il calendario</h2>
+      <p class="admin-description">Scrivi lo slogan per ogni canzone e scegli il video YouTube ufficiale o un audio che puoi utilizzare.</p>
+
+      <form id="loginForm" class="form-block">
+        <label for="passwordInput">Password organizzatore</label>
+        <input id="passwordInput" type="password" placeholder="Password mostrata nel terminale" required autocomplete="current-password">
+        <button class="button button-primary" type="submit">Accedi</button>
+        <p class="form-help">La password si trova nel terminale di VS Code al primo avvio.</p>
+      </form>
+
+      <div id="adminEditor" class="admin-editor" hidden>
+        <div class="field-group">
+          <label for="daySelect">Seleziona la casella</label>
+          <select id="daySelect"></select>
+        </div>
+        <div id="openState" class="open-state"></div>
+        <form id="songForm" class="form-block">
+          <div class="field-group"><label for="songTitleInput">Titolo della canzone</label><input id="songTitleInput" maxlength="100" required></div>
+          <div class="field-group"><label for="songArtistInput">Artista</label><input id="songArtistInput" maxlength="100"></div>
+          <div class="field-group">
+            <label for="songSloganInput">Slogan da mostrare quando si apre</label>
+            <textarea id="songSloganInput" rows="3" maxlength="500" placeholder="Es. Eh, Tik e Tak e…"></textarea>
+            <span class="form-help"><span id="sloganCounter">0</span> / 500 caratteri</span>
+          </div>
+          <div class="field-group" id="youtubeField">
+            <label for="youtubeInput">Link YouTube originale (o ID video)</label>
+            <input id="youtubeInput" type="text" placeholder="https://www.youtube.com/watch?v=...">
+            <span class="form-help">Il video partirà nella casella, se YouTube consente l'incorporamento.</span>
+          </div>
+          <button class="button button-primary" id="saveSong" type="submit">Salva modifiche</button>
+        </form>
+        <div id="uploadBox" class="upload-box">
+          <p class="upload-title">Oppure carica l'audio originale</p>
+          <p class="form-help">MP3, M4A, OGG o WAV, max 30 MB. Carica solo audio che hai diritto a utilizzare. Un file caricato ha precedenza su YouTube.</p>
+          <div class="upload-row">
+            <input type="file" id="audioInput" accept=".mp3,.m4a,.ogg,.wav,audio/*">
+            <button class="button button-secondary" id="uploadAudio" type="button">Carica audio</button>
+          </div>
+          <div class="audio-status" id="audioStatus"></div>
+          <button class="text-danger" id="removeAudio" type="button" hidden>Elimina audio caricato e usa YouTube</button>
+        </div>
+        <div class="admin-footer"><button class="text-link" id="logoutButton" type="button">Esci dalla gestione</button></div>
+      </div>
+    </div>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

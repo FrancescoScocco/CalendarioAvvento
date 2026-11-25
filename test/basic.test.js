@@ -30,3 +30,12 @@ test('Uno slogan non compare pubblicamente prima dell’apertura', () => {
 test('Le caselle aperte restano accessibili anche con il blocco data', () => {
   assert.equal(isUnlocked(10, '2026-12-10T10:00:00Z'), true);
 });
+
+test('Lo slogan resta nascosto se la casella non è stata aperta', () => {
+  const door = publicDoor({
+    day: 5, title: 'Segreta', artist: 'Band', type: 'song', openedAt: null,
+    slogan: 'Non spoilerare', audioFile: null, youtubeId: ''
+  });
+  assert.equal(door.slogan, null);
+  assert.equal(door.title, 'Segreta');
+});

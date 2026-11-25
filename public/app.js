@@ -7,16 +7,93 @@ const adminDialog = $('#adminDialog');
 const mediaMount = $('#mediaMount');
 const icons = ['🎵', '🎤', '🎶', '🎸', '🪩', '🎧', '⭐', '🎺', '🎄', '💃', '✨', '🥁', '🎙️', '💿', '🎹', '🎷', '🕺', '🏆', '🎻', '🌙', '💋', '♥️', '👑', '🎁'];
 const palettes = ['red', 'gold', 'green', 'cream', 'green', 'red', 'cream', 'gold'];
+const STORAGE_KEY = 'avvento-opened-days';
+const EVENT_YEAR_DEFAULT = 2026;
+
 let doors = [];
 let adminDoors = [];
 let activeDay = null;
 let toastTimer = null;
 let openingInProgress = false;
+let lockByDate = true;
+let eventYear = EVENT_YEAR_DEFAULT;
+let calendarToday = null;
+let staticMode = false;
+let staticCatalog = [];
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'": '&#39;'
   }[c]));
+}
+
+function romeDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  return Object.fromEntries(parts.filter((x) => x.type !== 'literal').map((x) => [x.type, Number(x.value)]));
+}
+
+function demoUnlocked() {
+  return new URLSearchParams(location.search).has('demo');
+}
+
+function isDayUnlocked(day, openedAt) {
+  if (openedAt || !lockByDate || demoUnlocked()) return true;
+  const { year, month, day: today } = calendarToday || romeDate();
+  return year > eventYear ||
+    (year === eventYear && (month > 12 || (month === 12 && today >= day)));
+}
+
+function readOpenedMap() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeOpenedMap(map) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+}
+
+function toPublicDoor(raw) {
+  const openedAt = raw.openedAt || null;
+  const opened = Boolean(openedAt);
+  const unlocked = isDayUnlocked(raw.day, openedAt);
+  return {
+    day: raw.day,
+    title: raw.title,
+    artist: raw.artist,
+    type: raw.type || 'song',
+    opened,
+    openedAt,
+    unlocked,
+    slogan: opened ? (raw.slogan || null) : null,
+    youtubeId: raw.youtubeId || '',
+    audioUrl: raw.audioFile ? `/media/${encodeURIComponent(raw.audioFile)}` : null,
+    hasMedia: Boolean(raw.audioFile || raw.youtubeId),
+    _slogan: raw.slogan || '',
+    _audioFile: raw.audioFile || null
+  };
+}
+
+function buildStaticPayload() {
+  const openedMap = readOpenedMap();
+  calendarToday = romeDate();
+  lockByDate = !demoUnlocked();
+  eventYear = EVENT_YEAR_DEFAULT;
+  const all = staticCatalog.map((item) => {
+    const openedAt = openedMap[String(item.day)] || null;
+    return toPublicDoor({ ...item, openedAt, audioFile: null });
+  });
+  return {
+    doors: all.filter((d) => d.unlocked),
+    lockByDate,
+    eventYear,
+    today: calendarToday
+  };
 }
 
 async function api(url, options = {}) {
@@ -38,53 +115,112 @@ function toast(text) {
   toastTimer = setTimeout(() => box.classList.remove('show'), 4200);
 }
 
+function emptyCalendarMessage() {
+  if (demoUnlocked()) return 'Nessuna casella da mostrare.';
+  if (!lockByDate) return 'Nessuna casella da mostrare.';
+  const today = calendarToday;
+  if (today && (today.year < eventYear || (today.year === eventYear && today.month < 12))) {
+    return `Le caselle si sbloccano dal 1 dicembre ${eventYear}. Torna tra poco!`;
+  }
+  return 'Nessuna casella disponibile in questo momento.';
+}
+
 function renderDoors() {
   const fragment = document.createDocumentFragment();
-  doors.forEach((door) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'door' + (door.opened ? ' opened' : '') + (!door.unlocked ? ' locked' : '');
-    button.dataset.color = palettes[(door.day - 1) % palettes.length];
-    button.dataset.finale = String(door.type === 'finale');
-    button.dataset.day = String(door.day);
-    button.setAttribute('aria-label', `${door.day} dicembre: ${door.opened ? 'casella già aperta' : door.unlocked ? 'apri la casella' : 'casella bloccata'}${door.opened ? ' - ' + door.title : ''}`);
-    if (door.opened) {
-      button.innerHTML = `
-        <span class="door-number">${door.day}</span>
-        <span class="door-symbol" aria-hidden="true">${door.type === 'finale' ? '🎄' : '♫'}</span>
-        <span class="door-title">${escapeHtml(door.title)}</span>
-        <span class="door-slogan">${escapeHtml(door.slogan || 'Slogan non ancora inserito')}</span>
-        <span class="door-bottom">${door.type === 'finale' ? 'Buon Natale!' : '♪ Riascolta'}</span>`;
-    } else {
-      button.innerHTML = `
-        <span class="door-number">${door.day}</span>
-        <span class="door-symbol" aria-hidden="true">${door.unlocked ? icons[door.day - 1] : '🔒'}</span>
-        <span class="door-bottom">${door.type === 'finale' ? 'Gran finale' : door.unlocked ? 'Scopri' : 'In arrivo'}</span>`;
-    }
-    button.addEventListener('click', () => openDoor(door.day));
-    fragment.appendChild(button);
-  });
+  if (!doors.length) {
+    const empty = document.createElement('div');
+    empty.className = 'loading-grid';
+    empty.textContent = emptyCalendarMessage();
+    fragment.appendChild(empty);
+  } else {
+    doors.forEach((door) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'door' + (door.opened ? ' opened' : '');
+      button.dataset.color = palettes[(door.day - 1) % palettes.length];
+      button.dataset.finale = String(door.type === 'finale');
+      button.dataset.day = String(door.day);
+      button.setAttribute('aria-label', `${door.day} dicembre: ${door.opened ? 'casella già aperta' : 'apri la casella'}${door.opened ? ' - ' + door.title : ''}`);
+      if (door.opened) {
+        button.innerHTML = `
+          <span class="door-number">${door.day}</span>
+          <span class="door-symbol" aria-hidden="true">${door.type === 'finale' ? '🎄' : '♫'}</span>
+          <span class="door-title">${escapeHtml(door.title)}</span>
+          <span class="door-slogan">${escapeHtml(door.slogan || 'Slogan non ancora inserito')}</span>
+          <span class="door-bottom">${door.type === 'finale' ? 'Buon Natale!' : '♪ Riascolta'}</span>`;
+      } else {
+        button.innerHTML = `
+          <span class="door-number">${door.day}</span>
+          <span class="door-symbol" aria-hidden="true">${icons[door.day - 1]}</span>
+          <span class="door-bottom">${door.type === 'finale' ? 'Gran finale' : 'Scopri'}</span>`;
+      }
+      button.addEventListener('click', () => openDoor(door.day));
+      fragment.appendChild(button);
+    });
+  }
   grid.replaceChildren(fragment);
   const count = doors.filter(d => d.type !== 'finale' && d.opened).length;
-  $('#progressLabel').textContent = count === 23 ? 'Tutte le canzoni scoperte! 🎉' : `${count} canzon${count === 1 ? 'e scoperta' : 'i scoperte'}`;
+  const available = doors.filter(d => d.type !== 'finale').length;
+  $('#progressLabel').textContent = count === 23
+    ? 'Tutte le canzoni scoperte! 🎉'
+    : lockByDate && available > 0 && available < 23
+      ? `${count} scoperte · oggi fino al giorno ${available}`
+      : `${count} canzon${count === 1 ? 'e scoperta' : 'i scoperte'}`;
   $('#progressFraction').textContent = `${count} / 23`;
   $('#progressFill').style.width = `${count / 23 * 100}%`;
   $('#progressTrack').setAttribute('aria-valuenow', String(count));
+  const tip = document.querySelector('.legend-tip');
+  if (tip) {
+    tip.textContent = lockByDate && !demoUnlocked()
+      ? '♪ Solo i giorni fino a oggi sono visibili'
+      : '♪ Clicca su un numero per ascoltare';
+  }
+}
+
+function applyCalendarResult(result) {
+  doors = result.doors;
+  lockByDate = Boolean(result.lockByDate);
+  eventYear = Number(result.eventYear) || eventYear;
+  calendarToday = result.today || romeDate();
+  renderDoors();
+  if (activeDay) {
+    const current = doors.find(d => d.day === activeDay);
+    if (current && current.opened) updatePlayerText(current);
+    else if (!current) closePlayer();
+  }
+}
+
+async function loadStaticCatalog() {
+  const response = await fetch('calendar-data.json', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Dati del calendario non trovati.');
+  staticCatalog = await response.json();
+  if (!Array.isArray(staticCatalog) || !staticCatalog.length) {
+    throw new Error('Dati del calendario non validi.');
+  }
 }
 
 async function refreshCalendar(silent = false) {
   try {
-    const result = await api('/api/calendar');
-    doors = result.doors;
-    renderDoors();
-    if (activeDay) {
-      const current = doors.find(d => d.day === activeDay);
-      if (current && current.opened) updatePlayerText(current);
+    if (staticMode) {
+      applyCalendarResult(buildStaticPayload());
+      return;
     }
+    const result = await api('/api/calendar');
+    staticMode = false;
+    applyCalendarResult(result);
   } catch (e) {
-    if (!silent) {
-      grid.innerHTML = '<div class="loading-grid">Impossibile connettersi al backend. Avvia il progetto con <strong>node server.js</strong>.</div>';
-      toast(e.message);
+    try {
+      if (!staticCatalog.length) await loadStaticCatalog();
+      staticMode = true;
+      applyCalendarResult(buildStaticPayload());
+      if (!silent && demoUnlocked()) {
+        toast('Anteprima demo: tutte le caselle sono visibili.');
+      }
+    } catch (fallbackError) {
+      if (!silent) {
+        grid.innerHTML = '<div class="loading-grid">Impossibile caricare il calendario.</div>';
+        toast(fallbackError.message || e.message);
+      }
     }
   }
 }
@@ -109,8 +245,7 @@ function createPlayer(door) {
     mediaMount.append(stars);
     return;
   }
-  // File audio locale: riproduzione su click, con i controlli nativi.
-  if (door.audioUrl) {
+  if (door.audioUrl && !staticMode) {
     const audio = document.createElement('audio');
     audio.className = 'audio-player';
     audio.src = door.audioUrl;
@@ -124,7 +259,6 @@ function createPlayer(door) {
     }
     return;
   }
-  // YouTube è servito dal sito originale, senza scaricare o distribuire il brano.
   if (door.youtubeId) {
     const shell = document.createElement('div');
     shell.className = 'video-shell';
@@ -163,14 +297,26 @@ async function openDoor(day) {
   activeDay = day;
   playerDialog.showModal();
   updatePlayerText(door, !door.opened);
-  createPlayer(door); // Crea subito il lettore, direttamente al click dell’utente.
+  createPlayer(door);
   if (door.opened) return;
   openingInProgress = true;
   try {
-    const result = await api(`/api/doors/${day}/open`, { method:'POST' });
-    doors = doors.map(d => d.day === day ? result.door : d);
-    renderDoors();
-    updatePlayerText(result.door);
+    if (staticMode) {
+      const openedAt = new Date().toISOString();
+      const map = readOpenedMap();
+      map[String(day)] = openedAt;
+      writeOpenedMap(map);
+      const raw = staticCatalog.find((d) => d.day === day) || {};
+      const updated = toPublicDoor({ ...raw, openedAt, audioFile: null });
+      doors = doors.map((d) => d.day === day ? updated : d);
+      renderDoors();
+      updatePlayerText(updated);
+    } else {
+      const result = await api(`/api/doors/${day}/open`, { method:'POST' });
+      doors = doors.map(d => d.day === day ? result.door : d);
+      renderDoors();
+      updatePlayerText(result.door);
+    }
   } catch (e) {
     toast(`Casella non aperta: ${e.message}`);
     playerDialog.close();
@@ -183,7 +329,7 @@ $('#closePlayer').addEventListener('click', closePlayer);
 $('#returnCalendar').addEventListener('click', closePlayer);
 playerDialog.addEventListener('close', () => {
   activeDay = null;
-  mediaMount.replaceChildren(); // Interrompe audio/video; NON richiude la casella.
+  mediaMount.replaceChildren();
 });
 playerDialog.addEventListener('click', (e) => { if (e.target === playerDialog) closePlayer(); });
 
@@ -230,6 +376,10 @@ async function loadAdminEditor() {
 }
 
 async function openAdmin() {
+  if (staticMode) {
+    toast('Su GitHub Pages la gestione è disattivata. Avvia node server.js in locale per modificare slogan e canzoni.');
+    return;
+  }
   adminDialog.showModal();
   try {
     const result = await api('/api/admin/me');
@@ -325,5 +475,4 @@ $('#logoutButton').addEventListener('click', async () => {
 });
 
 refreshCalendar();
-// Condivisione delle aperture: altre persone vedranno le caselle scoperte.
 setInterval(() => { if (!document.hidden) refreshCalendar(true); }, 15000);

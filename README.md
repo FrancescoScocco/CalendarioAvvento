@@ -27,7 +27,15 @@ Progetto completo per **VS Code** con HTML, CSS, JavaScript e backend Node.js **
 
 Non serve `npm install`. In alternativa usa `npm start`.
 
-**Non aprire `index.html` direttamente o con Live Server**: serve l'indirizzo di Node.js, perché lo stato viene salvato dal backend.
+In locale, per slogan condivisi e area **Gestisci**, usa l'indirizzo di Node.js (`http://127.0.0.1:3000`).
+
+## GitHub Pages
+
+Il sito pubblico è l'`index.html` in **root** (non il README). Con Pages impostato su branch `main` / folder `/(root)` si apre il calendario su:
+
+`https://francescoscocco.github.io/CalendarioAvvento/`
+
+Su Pages non c'è il backend Node: le aperture restano nel browser e **Gestisci** è disattivato. Prima del 1° dicembre le caselle restano nascoste; per un'anteprima di tutte le card aggiungi `?demo=1` all'URL.
 
 ## Scrivere gli slogan e configurare le canzoni
 
@@ -39,24 +47,21 @@ Non serve `npm install`. In alternativa usa `npm start`.
 
 Sono già configurati i link per molti successi celebri. Alcune caselle (es. **BALLETTOPOLO** e **YO YO YOMINO**) non hanno un video precompilato, per evitare di associare la registrazione sbagliata. Aggiungilo una volta dall'area Gestisci e poi potrai aprire la casella.
 
-## Attivare lo sblocco giornaliero a dicembre
+## Sblocco giornaliero a dicembre
 
-Per effettuare test, per impostazione predefinita tutte le caselle sono apribili da subito. Per consentire l'apertura solo **dal giorno previsto di dicembre 2026**:
+Di default si vedono e si possono aprire **solo le caselle fino al giorno corrente** (fuso **Europe/Rome**). Il 3 dicembre compaiono solo le prime 3; i giorni successivi restano nascosti.
 
-1. Copia `.env.example` in un file chiamato `.env` nella cartella principale.
-2. Configura:
+Per le prove fuori stagione, disattiva il blocco in `.env`:
 
-   ```env
-   PORT=3000
-   HOST=127.0.0.1
-   ADMIN_PASSWORD=UNA-PASSWORD-LUNGA-E-PRIVATA
-   LOCK_BY_DATE=1
-   EVENT_YEAR=2026
-   ```
+```env
+PORT=3000
+HOST=127.0.0.1
+ADMIN_PASSWORD=UNA-PASSWORD-LUNGA-E-PRIVATA
+LOCK_BY_DATE=0
+EVENT_YEAR=2026
+```
 
-3. Riavvia il server.
-
-La data viene controllata nel backend nel fuso **Europe/Rome**. Le caselle già aperte in fase di prova **resteranno aperte**, come richiesto. Se devi *intenzionalmente* ripartire da zero, elimina `data/calendar.json` **prima** del lancio: non farlo su un calendario già in uso.
+Poi riavvia il server. Le caselle già aperte in fase di prova **resteranno aperte** anche con il blocco attivo. Se devi *intenzionalmente* ripartire da zero, elimina `data/calendar.json` **prima** del lancio: non farlo su un calendario già in uso.
 
 ## Dove vengono conservati i dati
 
@@ -83,15 +88,14 @@ Le aperture sono **globali**: tutti vedono una casella aperta dallo stesso backe
 
 ```text
 calendario-avvento-musicale/
-├── server.js          # API, password, apertura e salvataggio
+├── index.html         # Calendario (anche su GitHub Pages)
+├── app.js / style.css
+├── calendar-data.json # Dati usati in modalità statica (Pages)
+├── server.js          # API locale, password, aperture condivise
 ├── package.json
 ├── .env.example
-├── public/
-│   ├── index.html     # Pagina e finestre di dialogo
-│   ├── style.css      # Stile natalizio responsive
-│   └── app.js         # Interazioni e gestione
+├── public/            # Mirror dei file del sito
 ├── data/
 │   └── seed.json      # 23 canzoni + casella di Natale
 └── uploads/           # Audio caricati
 ```
-# CalendarioAvvento
