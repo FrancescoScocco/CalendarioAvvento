@@ -1,0 +1,14 @@
+{
+  "name": "calendario-avvento-musicale",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Calendario dell'Avvento musicale, 23 brani, slogan modificabili e aperture persistenti.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
